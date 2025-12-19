@@ -3,8 +3,11 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.core.database import engine, Base
 from app.api.routes import prompts, auth
 
-# Create DB Tables on startup
-Base.metadata.create_all(bind=engine)
+try:
+    # Create DB Tables on startup
+    Base.metadata.create_all(bind=engine)
+except Exception as e:
+    print(f"Warning: Database creation skipped or failed (likely already exists): {e}")
 
 app = FastAPI(
     title="PromptOptim API",
