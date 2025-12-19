@@ -25,12 +25,27 @@ app.add_middleware(
 app.include_router(prompts.router, prefix="/api", tags=["Prompts"])
 app.include_router(auth.router, tags=["Authentication"])
 
+from fastapi import Depends, HTTPException
+from sqlalchemy.orm import Session
+from sqlalchemy import text
+from app.core.database import get_db
+
 @app.get("/health")
-async def health_check():
+async def health_check(db: Session = Depends(get_db)):
     """
-    Health check endpoint to verify backend status.
+    Health check endpoint to verify backend status and database connectivity.
     """
-    return {"status": "ok", "project": "PromptOptim"}
+    try:
+        # Perform a simple query to check DB connection
+        db.execute(text("SELECT 1"))
+        return {"status": "ok", "project": "PromptOptim", "database": "connected"}
+    except Exception as e:
+        # Log the error (in a real app, use a logger)
+        print(f"Health Check Failed: {e}")
+        raise HTTPException(
+            status_code=503,
+            detail=f"Database connection failed: {str(e)}"
+        )
 
 if __name__ == "__main__":
     import uvicorn
