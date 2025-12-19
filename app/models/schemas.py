@@ -22,15 +22,21 @@ class PromptRequest(BaseModel):
     target_model: str = "gpt-3.5-turbo" # Default model
 
 class PromptResponse(BaseModel):
-    original_text: str
+    original_intent: str
     optimized_prompt: str
-    ai_model_used: str
-    green_score: float
-    sovereignty_location: str
+    target_model: str
+    green_data: Optional[dict] = None
+    sovereignty_data: Optional[dict] = None
 
 class PromptHistoryRead(PromptResponse):
     id: int
-    timestamp: datetime
+    created_at: datetime
 
     class Config:
         from_attributes = True
+
+class UserStatsResponse(BaseModel):
+    total_prompts: int
+    total_tokens_saved: int
+    total_co2_saved: float
+    model_usage: dict

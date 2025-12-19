@@ -49,3 +49,18 @@ def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(), db:
         data={"sub": user.email}, expires_delta=access_token_expires
     )
     return {"access_token": access_token, "token_type": "bearer"}
+
+from app.core.security import get_current_user
+
+@router.delete("/users/me", status_code=status.HTTP_204_NO_CONTENT)
+def delete_own_account(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Delete the current authenticated user.
+    The database cascade will automatically handle deleting associated prompts.
+    """
+    db.delete(current_user)
+    db.commit()
+    return None
