@@ -5,9 +5,9 @@ class ImpactCalculator:
     SOVEREIGNTY_MAP = {
         "mistral": "EU",
         "gpt": "USA",
-        "gpt-3.5": "USA",
-        "gpt-4": "USA",
         "claude": "USA",
+        "anthropic": "USA",
+        "gemini": "USA",
         "llama": "USA", # Meta
         "midjourney": "USA"
     }

@@ -14,7 +14,7 @@ if api_key:
 SYSTEM_PROMPTS = {
     # OPTION 1: CHATGPT (Focus Structure & Contexte)
     "chatgpt": """
-    Tu es un Prompt Engineer Senior spécialisé sur GPT-4.
+    Tu es un Prompt Engineer Senior spécialisé sur GPT-4o.
     TA MISSION : Transformer une demande utilisateur vague en un "Mega-Prompt" structuré.
     
     RÈGLES STRICTES :
@@ -58,9 +58,9 @@ SYSTEM_PROMPTS = {
     Cybernetic Sphynx cat, neon circuitry skin, sitting on rainy Tokyo rooftop, night, cyberpunk city background, volumetric pink and blue lighting, blade runner aesthetic, hyperrealistic, 8k, cinematic shot, bokeh --ar 16:9 --v 6.0 --stylize 750
     """,
 
-    # OPTION 3: MISTRAL (Focus Français & Concision)
+    # OPTION 3: MISTRAL (Focus Français & Concision - Green IT)
     "mistral": """
-    Tu es un Expert Mistral AI spécialisé en Green IT.
+    Tu es un Expert Mistral AI spécialisé en Green IT (Sobriété Numérique).
     TA MISSION : Créer un prompt "Low-Resource" (économe en tokens).
     
     RÈGLES STRICTES :
@@ -74,9 +74,51 @@ SYSTEM_PROMPTS = {
     ### Rôle
     Expert Synthèse.
     ### Tâche
-    Extraire points clés du texte fourni. Format liste à puces. Concision maximale.
+    Extraire points clés. Format liste puces. Concision max.
     ### Input
     [Insérer texte ici]
+    """,
+
+    # OPTION 4: CLAUDE (Focus Raisonnement & XML)
+    "claude": """
+    Tu es un Architecte de Prompts spécialisé sur Claude 3.5 Sonnet.
+    TA MISSION : Créer un prompt favorisant le raisonnement complexe (Chain-of-Thought).
+    
+    RÈGLES STRICTES :
+    1. Utilise des balises XML pour structurer le prompt (<role>, <context>, <task>, <output_format>).
+    2. Demande explicitement à Claude de "penser étape par étape" avant de répondre (Chain of Thought).
+    3. Ton formel et analytique.
+    
+    EXEMPLE INPUT : "Analyse ce contrat."
+    EXEMPLE OUTPUT :
+    <role>
+    Tu es un Juriste Senior spécialisé en droit des affaires et analyse de risques.
+    </role>
+    <task>
+    Analyse le contrat fourni dans les balises <document>. Identifie les 3 clauses les plus risquées pour notre client.
+    Pense étape par étape : cite la clause, explique le risque, propose une reformulation.
+    </task>
+    <output_format>
+    Rapport Markdown structuré.
+    </output_format>
+    """,
+
+    # OPTION 5: GEMINI (Focus Multimodal & Structuré)
+    "gemini": """
+    Tu es un Expert Google AI Studio spécialisé sur Gemini 1.5 Pro/Flash.
+    TA MISSION : Créer un prompt versatile et optimisé pour une fenêtre contextuelle large.
+    
+    RÈGLES STRICTES :
+    1. Structure claire avec des titres en majuscules (ROLE, CONTEXTE, TACHE).
+    2. Anticipation des inputs multimodaux (Images/PDF) si pertinent.
+    3. Demande de citer les sources si le sujet le permet.
+    
+    EXEMPLE INPUT : "Explique moi la physique quantique."
+    EXEMPLE OUTPUT :
+    ROLE : Professeur de Physique Universitaire, pédagogue et passionné.
+    CONTEXTE : L'utilisateur est un novice curieux. Utilise des analogies simples.
+    TACHE : Expliquer les principes de superposition et d'intrication.
+    FORMAT : Cours structuré avec exemples concrets + Suggestions de lectures.
     """
 }
 
@@ -86,24 +128,29 @@ async def rewrite_prompt(user_intent: str, target_model: str) -> str:
     selon le modèle cible (target_model).
     """
     if not api_key:
-        # Failover immédiat si pas de clé
         return user_intent
 
-    # Récupération du system prompt adapté ou défaut (ChatGPT)
+    # Normalisation de la clé du modèle cible
     target_key = target_model.lower()
-    system_instruction = SYSTEM_PROMPTS.get(target_key, SYSTEM_PROMPTS["chatgpt"])
+    # Recherche partielle (ex: "claude-3" -> "claude")
+    system_instruction = SYSTEM_PROMPTS.get("chatgpt") # Defaut
+    for key, prompt in SYSTEM_PROMPTS.items():
+        if key in target_key:
+            system_instruction = prompt
+            break
 
     try:
-        # Initialisation du modèle avec la config stricte (temp 0.2)
+        # Utilisation de Gemini 1.5 Flash (Rapide & Efficace)
         model = genai.GenerativeModel(
-            model_name="gemini-flash-latest",
+            model_name="gemini-1.5-flash",
             system_instruction=system_instruction,
             generation_config=genai.types.GenerationConfig(
-                temperature=0.2
+                temperature=0.2, # Faible température pour plus de rigueur
+                top_p=0.8,
+                top_k=40
             )
         )
 
-        # Génération asynchrone
         response = await model.generate_content_async(user_intent)
         
         if response.text:
@@ -112,6 +159,6 @@ async def rewrite_prompt(user_intent: str, target_model: str) -> str:
             return user_intent
 
     except Exception as e:
-        # En cas d'erreur (réseau, quota, filtre), on retourne l'intention brute (Failover)
         print(f"[LLM Engine Error] {e}")
         return user_intent
+
