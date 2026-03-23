@@ -1,4 +1,5 @@
-from pydantic import BaseModel, EmailStr, field_validator
+from pydantic import BaseModel, ConfigDict, EmailStr, field_validator
+from datetime import datetime
 import re
 
 
@@ -51,6 +52,8 @@ class ResetPasswordRequest(BaseModel):
 
 
 class TokenResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     access_token: str
     refresh_token: str
     token_type: str = "bearer"
@@ -59,9 +62,11 @@ class TokenResponse(BaseModel):
 
 
 class UserResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: str
     email: str
-    created_at: str | None = None
+    created_at: datetime | None = None
 
 
 class MessageResponse(BaseModel):

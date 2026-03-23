@@ -1,6 +1,7 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 from enum import Enum
 from datetime import datetime
+from typing import Literal
 
 
 class ModelType(str, Enum):
@@ -27,7 +28,7 @@ class GreenData(BaseModel):
     energy_saved_kwh: float
     co2_saved_g: float
     water_saved_ml: float
-    eco_score: str  # A, B, C, D, E
+    eco_score: Literal["A", "B", "C", "D", "E"]
     equivalences: Equivalences
     methodology_source: str
     timestamp_factor: float
@@ -42,6 +43,8 @@ class SovereigntyData(BaseModel):
 
 
 class PromptResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     original_intent: str
     optimized_prompt: str
     target_model: str
@@ -51,11 +54,15 @@ class PromptResponse(BaseModel):
 
 
 class PromptHistoryRead(PromptResponse):
+    model_config = ConfigDict(from_attributes=True)
+
     id: int
     created_at: datetime
 
 
 class UserStatsResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     total_prompts: int
     total_tokens_saved: int
     total_co2_saved: float
