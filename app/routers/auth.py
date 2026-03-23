@@ -20,27 +20,29 @@ router = APIRouter()
 limiter = Limiter(key_func=get_remote_address)
 
 
-@router.post("/register", status_code=201, response_model=MessageResponse)
 @limiter.limit("5/minute")
+@router.post("/register", status_code=201, response_model=MessageResponse)
 async def register(request: Request, data: RegisterRequest, supabase: Client = Depends(get_supabase)):
     """Register a new user. Supabase sends verification email automatically."""
     supabase.auth.sign_up({"email": data.email, "password": data.password})
     return {"message": "Registration successful. Please check your email to verify your account."}
 
 
-@router.post("/login", response_model=TokenResponse)
 @limiter.limit("10/minute")
+@router.post("/login", response_model=TokenResponse)
 async def login(request: Request, data: LoginRequest, supabase: Client = Depends(get_supabase)):
     """Login with email + password. Returns Supabase JWT tokens."""
     response = supabase.auth.sign_in_with_password({"email": data.email, "password": data.password})
     session = response.session
-    user = response.user
+    user_obj = response.user
+    if not session or not user_obj:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication failed")
     return TokenResponse(
         access_token=session.access_token,
         refresh_token=session.refresh_token,
         token_type="bearer",
         expires_in=session.expires_in,
-        user={"id": str(user.id), "email": user.email},
+        user={"id": str(user_obj.id), "email": user_obj.email},
     )
 
 
@@ -63,18 +65,19 @@ async def refresh_token(data: RefreshRequest, supabase: Client = Depends(get_sup
 @router.post("/logout", response_model=MessageResponse)
 async def logout(
     user=Depends(get_current_user),
-    supabase: Client = Depends(get_supabase),
+    supabase_admin: Client = Depends(get_supabase_admin),
 ):
-    """Logout — invalidates token on Supabase side."""
+    """Logout — invalidates session on Supabase side."""
     try:
-        supabase.auth.sign_out()
+        supabase_admin.auth.admin.sign_out(str(user.id))
     except Exception:
         pass
     return {"message": "Logged out successfully"}
 
 
+@limiter.limit("3/minute")
 @router.post("/forgot-password", response_model=MessageResponse)
-async def forgot_password(data: ForgotPasswordRequest, supabase: Client = Depends(get_supabase)):
+async def forgot_password(request: Request, data: ForgotPasswordRequest, supabase: Client = Depends(get_supabase)):
     """Request password reset email. Always returns 200 to prevent enumeration."""
     try:
         supabase.auth.reset_password_email(
@@ -86,14 +89,15 @@ async def forgot_password(data: ForgotPasswordRequest, supabase: Client = Depend
     return {"message": "If this email is registered, you will receive a reset link."}
 
 
+@limiter.limit("5/minute")
 @router.post("/reset-password", response_model=MessageResponse)
-async def reset_password(data: ResetPasswordRequest, supabase: Client = Depends(get_supabase)):
+async def reset_password(request: Request, data: ResetPasswordRequest, supabase: Client = Depends(get_supabase)):
     """Reset password using tokens from Supabase redirect URL fragment."""
     try:
         supabase.auth.set_session(data.access_token, data.refresh_token)
         supabase.auth.update_user({"password": data.new_password})
     except Exception as e:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid or expired reset token")
     return {"message": "Password updated successfully"}
 
 
