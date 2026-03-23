@@ -1,8 +1,11 @@
 import asyncio
 import json
 from mistralai import Mistral
+from fastapi import HTTPException
 from app.config import settings
 from app.schemas.prompts import ModelType
+
+_client = Mistral(api_key=settings.MISTRAL_API_KEY)
 
 # System prompts tailored to each target model's expected prompt style
 _SYSTEM_PROMPTS = {
@@ -34,26 +37,35 @@ Reponds UNIQUEMENT en JSON avec les champs "reasoning" (explication de tes choix
 
 async def rewrite_prompt(user_intent: str, target_model: ModelType) -> dict:
     """Call Mistral AI to rewrite the user intent as an optimized prompt for the target model."""
-    client = Mistral(api_key=settings.MISTRAL_API_KEY)
     system_prompt = _SYSTEM_PROMPTS.get(target_model, _SYSTEM_PROMPTS[ModelType.MISTRAL_2])
 
-    response = await asyncio.to_thread(
-        client.chat.complete,
-        model="mistral-small-latest",
-        messages=[
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_intent},
-        ],
-        response_format={"type": "json_object"},
-        temperature=0.3,
-    )
+    try:
+        response = await asyncio.wait_for(
+            asyncio.to_thread(
+                _client.chat.complete,
+                model="mistral-small-latest",
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_intent},
+                ],
+                response_format={"type": "json_object"},
+                temperature=0.3,
+            ),
+            timeout=30.0,
+        )
+    except asyncio.TimeoutError:
+        raise HTTPException(status_code=503, detail="AI service timeout. Please try again.")
+    except Exception:
+        raise HTTPException(status_code=503, detail="AI service unavailable. Please try again.")
 
+    if not response.choices:
+        raise HTTPException(status_code=503, detail="AI service returned empty response.")
     content = response.choices[0].message.content
     try:
         result = json.loads(content)
         return {
             "optimized_prompt": result.get("optimized_prompt", content),
-            "reasoning": result.get("reasoning", ""),
+            "reasoning": result.get("reasoning", None),
         }
     except json.JSONDecodeError:
-        return {"optimized_prompt": content, "reasoning": ""}
+        return {"optimized_prompt": content, "reasoning": None}

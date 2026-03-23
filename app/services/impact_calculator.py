@@ -89,7 +89,9 @@ def _eco_score(co2_saved_g: float) -> str:
 
 
 def calculate_green_impact(original_text: str, optimized_text: str, model_name: str) -> GreenData:
-    meta = _MODEL_META.get(model_name, _MODEL_META["mistral_2"])
+    meta = _MODEL_META.get(model_name)
+    if meta is None:
+        raise ValueError(f"Unknown model: {model_name}")
     tokens_original = _count_tokens(original_text)
     tokens_optimized = _count_tokens(optimized_text)
     tokens_saved = max(0, tokens_original - tokens_optimized)
@@ -119,7 +121,9 @@ def calculate_green_impact(original_text: str, optimized_text: str, model_name: 
 
 
 def get_sovereignty_data(model_name: str) -> SovereigntyData:
-    meta = _MODEL_META.get(model_name, _MODEL_META["mistral_2"])
+    meta = _MODEL_META.get(model_name)
+    if meta is None:
+        raise ValueError(f"Unknown model: {model_name}")
     return SovereigntyData(
         score=meta["sovereignty_score"],
         location=meta["location"],
