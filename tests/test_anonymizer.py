@@ -6,8 +6,22 @@ def test_scrub_email():
 
 
 def test_scrub_url():
-    result = scrub_pii("Visit https://www.example.com/page")
-    assert "[URL]" in result
+    assert scrub_pii("Visit https://www.example.com/page") == "Visit [URL]"
+
+
+def test_scrub_iban():
+    result = scrub_pii("My IBAN is FR7630006000011234567890189")
+    assert "[IBAN]" in result
+
+
+def test_scrub_credit_card():
+    result = scrub_pii("Card number 4111 1111 1111 1111")
+    assert "[CREDIT_CARD]" in result
+
+
+def test_scrub_ssn():
+    result = scrub_pii("SSN: 1 85 12 75 056 789 12")
+    assert "[SSN]" in result
 
 
 def test_scrub_phone_fr():

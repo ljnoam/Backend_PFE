@@ -10,7 +10,7 @@ def make_mock_user(user_id="test-user-id", email="test@example.com"):
     user = MagicMock()
     user.id = user_id
     user.email = email
-    user.created_at = None
+    user.created_at = "2026-01-01T00:00:00Z"
     return user
 
 

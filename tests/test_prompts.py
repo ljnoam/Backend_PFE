@@ -39,6 +39,7 @@ def test_generate_prompt(client, mock_supabase):
         assert body["optimized_prompt"] == "Optimized prompt"
         assert "green_data" in body
         assert "sovereignty_data" in body
+        assert "ai_reasoning" in body  # field is present (may be None)
 
 
 def test_generate_input_too_long(client):
@@ -83,3 +84,21 @@ def test_stats_empty(client, mock_supabase):
     assert body["total_tokens_saved"] == 0
     assert body["total_co2_saved"] == 0.0
     assert body["model_usage"] == {}
+
+
+def test_stats_with_data(client, mock_supabase):
+    rows = [
+        {"target_model": "mistral_2", "green_data": {"tokens_saved": 10, "co2_saved_g": 0.5}},
+        {"target_model": "gpt_5", "green_data": {"tokens_saved": 20, "co2_saved_g": 1.0}},
+        {"target_model": "mistral_2", "green_data": {"tokens_saved": 5, "co2_saved_g": 0.2}},
+    ]
+    mock_supabase.table.return_value.select.return_value.eq.return_value \
+        .execute.return_value = MagicMock(data=rows)
+    response = client.get("/api/stats")
+    assert response.status_code == 200
+    body = response.json()
+    assert body["total_prompts"] == 3
+    assert body["total_tokens_saved"] == 35
+    assert abs(body["total_co2_saved"] - 1.7) < 0.001
+    assert body["model_usage"]["mistral_2"] == 2
+    assert body["model_usage"]["gpt_5"] == 1
