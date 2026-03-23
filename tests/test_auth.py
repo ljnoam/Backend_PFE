@@ -103,7 +103,7 @@ def test_delete_me(client, mock_supabase):
     mock_supabase.auth.admin.delete_user.return_value = None
     response = client.delete("/auth/me")
     assert response.status_code == 204
-    mock_supabase.auth.admin.delete_user.assert_called_once()
+    mock_supabase.auth.admin.delete_user.assert_called_once_with("test-user-id")
 
 
 def test_refresh_token_success(client, mock_supabase):
