@@ -1,14 +1,12 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from supabase import Client
-from slowapi import Limiter
-from slowapi.util import get_remote_address
 
 from app.dependencies import get_supabase, get_current_user
+from app.limiter import limiter
 from app.schemas.prompts import PromptRequest, PromptResponse, PromptHistoryRead, UserStatsResponse
 from app.services import anonymizer, llm_engine, impact_calculator
 
 router = APIRouter()
-limiter = Limiter(key_func=get_remote_address)
 
 
 @limiter.limit("20/minute")
@@ -29,6 +27,8 @@ async def generate_prompt(
     reasoning = llm_result["reasoning"]
 
     # 3. Calculate green impact
+    # Green impact is measured from the original (pre-anonymization) intent.
+    # This reflects the real user intent length, not the PII-redacted version.
     green_data = impact_calculator.calculate_green_impact(
         original_text=data.input_text,
         optimized_text=optimized_prompt,
@@ -39,15 +39,21 @@ async def generate_prompt(
     sovereignty_data = impact_calculator.get_sovereignty_data(data.target_model.value)
 
     # 5. Save to history
-    supabase.table("prompt_history").insert({
-        "user_id": str(user.id),
-        "original_intent": data.input_text,
-        "optimized_prompt": optimized_prompt,
-        "target_model": data.target_model.value,
-        "green_data": green_data.model_dump(),
-        "sovereignty_data": sovereignty_data.model_dump(),
-        "ai_reasoning": reasoning,
-    }).execute()
+    try:
+        supabase.table("prompt_history").insert({
+            "user_id": str(user.id),
+            "original_intent": data.input_text,
+            "optimized_prompt": optimized_prompt,
+            "target_model": data.target_model.value,
+            "green_data": green_data.model_dump(),
+            "sovereignty_data": sovereignty_data.model_dump(),
+            "ai_reasoning": reasoning,
+        }).execute()
+    except Exception:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Failed to save prompt to history."
+        )
 
     return PromptResponse(
         original_intent=data.input_text,
@@ -86,7 +92,7 @@ async def get_stats(
     """Return aggregated statistics for the authenticated user."""
     result = (
         supabase.table("prompt_history")
-        .select("*")
+        .select("green_data,target_model")
         .eq("user_id", str(user.id))
         .execute()
     )

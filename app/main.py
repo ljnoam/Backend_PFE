@@ -1,12 +1,11 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from slowapi import Limiter
-from slowapi.util import get_remote_address
 from slowapi.middleware import SlowAPIMiddleware
 from slowapi.errors import RateLimitExceeded
 
 from app.config import settings
+from app.limiter import limiter
 from app.routers import auth, prompts, models, templates
 from app.utils.error_handlers import register_error_handlers
 
@@ -16,7 +15,6 @@ app = FastAPI(
     version="5.0.0",
 )
 
-limiter = Limiter(key_func=get_remote_address)
 app.state.limiter = limiter
 app.add_middleware(SlowAPIMiddleware)
 
