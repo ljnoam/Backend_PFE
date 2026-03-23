@@ -1,3 +1,4 @@
+import asyncio
 import json
 from mistralai import Mistral
 from app.config import settings
@@ -36,7 +37,8 @@ async def rewrite_prompt(user_intent: str, target_model: ModelType) -> dict:
     client = Mistral(api_key=settings.MISTRAL_API_KEY)
     system_prompt = _SYSTEM_PROMPTS.get(target_model, _SYSTEM_PROMPTS[ModelType.MISTRAL_2])
 
-    response = client.chat.complete(
+    response = await asyncio.to_thread(
+        client.chat.complete,
         model="mistral-small-latest",
         messages=[
             {"role": "system", "content": system_prompt},
