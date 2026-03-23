@@ -26,7 +26,13 @@ async def list_templates(
     if category:
         query = query.eq("category", category)
 
-    result = query.order("created_at", desc=True).range(skip, skip + limit - 1).execute()
+    try:
+        result = query.order("created_at", desc=True).range(skip, skip + limit - 1).execute()
+    except Exception:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Failed to fetch templates."
+        )
 
     return [
         {**row, "is_mine": row.get("user_id") == str(user.id)}
@@ -79,4 +85,9 @@ async def delete_template(
     if not check.data:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Template not found")
 
-    supabase.table("prompt_templates").delete().eq("id", template_id).execute()
+    delete_result = supabase.table("prompt_templates").delete().eq("id", template_id).execute()
+    if not delete_result.data:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Failed to delete template."
+        )
