@@ -1,6 +1,14 @@
 from fastapi import FastAPI, Request, HTTPException
 from fastapi.responses import JSONResponse
-from gotrue.errors import AuthApiError
+try:
+    from gotrue.errors import AuthApiError
+except ImportError:
+    try:
+        from supabase_auth.errors import AuthApiError
+    except ImportError:
+        # Fallback for other potential import paths if needed
+        from supabase.auth.errors import AuthApiError
+
 
 
 def register_error_handlers(app: FastAPI):
