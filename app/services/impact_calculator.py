@@ -65,6 +65,8 @@ _ENCODER = tiktoken.get_encoding("cl100k_base")
 
 
 def _count_tokens(text: str) -> int:
+    if not isinstance(text, str):
+        return 0
     return len(_ENCODER.encode(text))
 
 

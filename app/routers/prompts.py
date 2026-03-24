@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from supabase import Client
 
-from app.dependencies import get_supabase, get_current_user
+from app.dependencies import get_supabase, get_supabase_admin, get_current_user
 from app.limiter import limiter
 from app.schemas.prompts import PromptRequest, PromptResponse, PromptHistoryRead, UserStatsResponse
 from app.services import anonymizer, llm_engine, impact_calculator
@@ -15,8 +15,9 @@ async def generate_prompt(
     request: Request,
     data: PromptRequest,
     user=Depends(get_current_user),
-    supabase: Client = Depends(get_supabase),
+    supabase: Client = Depends(get_supabase_admin),
 ):
+
     """Main route: anonymize PII → optimize with Mistral → calculate Green IT & sovereignty → save to history."""
     # 1. Anonymize PII
     anonymized_text = anonymizer.scrub_pii(data.input_text)
@@ -49,11 +50,12 @@ async def generate_prompt(
             "sovereignty_data": sovereignty_data.model_dump(),
             "ai_reasoning": reasoning,
         }).execute()
-    except Exception:
+    except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
-            detail="Failed to save prompt to history."
+            detail=f"Failed to save prompt to history: {str(e)}"
         )
+
 
     return PromptResponse(
         original_intent=data.input_text,
@@ -70,8 +72,9 @@ async def get_history(
     skip: int = Query(default=0, ge=0),
     limit: int = Query(default=100, ge=1, le=500),
     user=Depends(get_current_user),
-    supabase: Client = Depends(get_supabase),
+    supabase: Client = Depends(get_supabase_admin),
 ):
+
     """Return user's prompt history, newest first."""
     result = (
         supabase.table("prompt_history")
@@ -87,8 +90,9 @@ async def get_history(
 @router.get("/stats", response_model=UserStatsResponse)
 async def get_stats(
     user=Depends(get_current_user),
-    supabase: Client = Depends(get_supabase),
+    supabase: Client = Depends(get_supabase_admin),
 ):
+
     """Return aggregated statistics for the authenticated user."""
     result = (
         supabase.table("prompt_history")

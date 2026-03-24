@@ -60,12 +60,18 @@ async def rewrite_prompt(user_intent: str, target_model: ModelType) -> dict:
 
     if not response.choices:
         raise HTTPException(status_code=503, detail="AI service returned empty response.")
-    content = response.choices[0].message.content
+    content = response.choices[0].message.content or ""
+
     try:
+        # Mistral with json_object format should return valid JSON
         result = json.loads(content)
         return {
-            "optimized_prompt": result.get("optimized_prompt", content),
-            "reasoning": result.get("reasoning", None),
+            "optimized_prompt": str(result.get("optimized_prompt") or content),
+            "reasoning": result.get("reasoning", ""),
         }
-    except json.JSONDecodeError:
-        return {"optimized_prompt": content, "reasoning": None}
+    except (json.JSONDecodeError, TypeError, AttributeError):
+        return {
+            "optimized_prompt": str(content),
+            "reasoning": "",
+        }
+
