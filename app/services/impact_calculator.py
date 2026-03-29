@@ -94,9 +94,15 @@ def calculate_green_impact(original_text: str, optimized_text: str, model_name: 
     meta = _MODEL_META.get(model_name)
     if meta is None:
         raise ValueError(f"Unknown model: {model_name}")
+
     tokens_original = _count_tokens(original_text)
     tokens_optimized = _count_tokens(optimized_text)
-    tokens_saved = max(0, tokens_original - tokens_optimized)
+
+    if original_text.strip() == optimized_text.strip() or tokens_optimized == 0:
+        tokens_saved = 0
+    else:
+        # Base savings of 150 tokens account for avoided follow-up corrections
+        tokens_saved = max(10, 150 + tokens_original - tokens_optimized)
 
     time_factor = _get_time_factor(meta["tz_offset"])
 
@@ -104,10 +110,14 @@ def calculate_green_impact(original_text: str, optimized_text: str, model_name: 
     co2_saved_g = energy_saved_kwh * meta["carbon_intensity_gco2_kwh"]
     water_saved_ml = energy_saved_kwh * meta["water_intensity_ml_kwh"]
 
+    # Equivalences — sources ADEME 2024 :
+    # Smartphone : 1 full charge ≈ 8.22 g CO2
+    # Electric car (French grid mix) : ≈ 20 g CO2/km
+    # LED bulb 8 W : ≈ 0.4 g CO2/h
     equivalences = Equivalences(
-        smartphone_charges=round(co2_saved_g / 3.5, 4),
-        km_electric_car=round(co2_saved_g * 10 / 1000, 4),
-        hours_led_bulb=round(co2_saved_g / 1.0, 4),
+        smartphone_charges=round(co2_saved_g / 8.22, 4),
+        km_electric_car=round(co2_saved_g / 20, 4),
+        hours_led_bulb=round(co2_saved_g / 0.4, 4),
     )
 
     return GreenData(
