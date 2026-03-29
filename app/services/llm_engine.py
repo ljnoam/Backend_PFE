@@ -1,5 +1,7 @@
 import asyncio
 import json
+import ast
+import re
 from mistralai import Mistral
 from fastapi import HTTPException
 from app.config import settings
@@ -119,7 +121,7 @@ async def rewrite_prompt(user_intent: str, target_model: ModelType) -> dict:
                 ],
                 response_format={"type": "json_object"},
                 temperature=0.2,
-                max_tokens=1024,
+                max_tokens=2048,
             ),
             timeout=30.0,
         )
@@ -130,19 +132,37 @@ async def rewrite_prompt(user_intent: str, target_model: ModelType) -> dict:
 
     if not response.choices:
         raise HTTPException(status_code=503, detail="AI service returned empty response.")
+    
     content = response.choices[0].message.content or ""
+    
+    # --- Robust Parsing ---
+    # 1. Cleanup markdown code blocks if any
+    clean_content = re.sub(r"```(?:json)?\s*(.*?)\s*```", r"\1", content, flags=re.DOTALL).strip()
 
+    result = {}
     try:
-        result = json.loads(content)
-        optimized = result.get("optimized_prompt")
-        if not optimized:
-            raise ValueError("Missing 'optimized_prompt' field")
+        # 2. Try standard JSON
+        result = json.loads(clean_content)
+    except json.JSONDecodeError:
+        try:
+            # 3. Try Python-style dict string (often happens with Mistral/Claude)
+            result = ast.literal_eval(clean_content)
+        except (ValueError, SyntaxError):
+            # 4. Fallback: if it starts/ends with quotes, it might be just the prompt itself?
+            # Or we return it as is but it failed to parse.
+            pass
+
+    optimized = result.get("optimized_prompt") or result.get("prompt")
+    reasoning = result.get("reasoning") or result.get("explanation", "")
+
+    # If parsing failed or we didn't find the key, use the raw content as the prompt
+    if not optimized:
         return {
-            "optimized_prompt": str(optimized),
-            "reasoning": result.get("reasoning", ""),
-        }
-    except (json.JSONDecodeError, TypeError, ValueError):
-        return {
-            "optimized_prompt": str(content),
+            "optimized_prompt": str(content).strip(),
             "reasoning": "",
         }
+
+    return {
+        "optimized_prompt": str(optimized).strip(),
+        "reasoning": str(reasoning).strip(),
+    }
